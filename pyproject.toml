@@ -1,0 +1,13 @@
+[project]
+name = "mydays-bot"
+version = "0.1.0"
+description = "A self-hosted chat bridge for Pi"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+mydays-bot = "mydays_bot.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.11.2,<0.12.0"]
+build-backend = "uv_build"
