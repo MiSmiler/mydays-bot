@@ -1,6 +1,7 @@
 import asyncio
 import sys
 import unittest
+from unittest.mock import patch
 
 from mydays_bot.pi_rpc import PiRpcClient, PiRpcError
 
@@ -54,6 +55,36 @@ for line in sys.stdin.buffer:
 
 
 class PiRpcClientTest(unittest.IsolatedAsyncioTestCase):
+    async def test_launches_pi_with_fixed_model_and_without_optional_resources(self):
+        with (
+            patch("mydays_bot.pi_rpc.shutil.which", return_value="pi"),
+            patch(
+                "mydays_bot.pi_rpc.asyncio.create_subprocess_exec",
+                side_effect=FileNotFoundError("Pi executable not found"),
+            ) as launch,
+        ):
+            with self.assertRaisesRegex(PiRpcError, "Could not start Pi RPC"):
+                async with PiRpcClient():
+                    pass
+
+        launch.assert_awaited_once_with(
+            "pi",
+            "--mode",
+            "rpc",
+            "--provider",
+            "deepseek",
+            "--model",
+            "deepseek-flash",
+            "--no-extensions",
+            "--no-skills",
+            "--no-prompt-templates",
+            "--no-mcp",
+            "--no-themes",
+            "--no-context-files",
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+        )
+
     async def test_routes_replies_and_preserves_lf_framing(self):
         command = (sys.executable, "-u", "-c", PI_DOUBLE)
         async with asyncio.timeout(5), PiRpcClient(command) as pi:

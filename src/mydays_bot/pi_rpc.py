@@ -8,6 +8,22 @@ from typing import Any, Self
 
 type Record = dict[str, Any]
 
+_DEFAULT_COMMAND = (
+    "pi",
+    "--mode",
+    "rpc",
+    "--provider",
+    "deepseek",
+    "--model",
+    "deepseek-flash",
+    "--no-extensions",
+    "--no-skills",
+    "--no-prompt-templates",
+    "--no-mcp",
+    "--no-themes",
+    "--no-context-files",
+)
+
 
 class PiRpcError(RuntimeError):
     pass
@@ -16,7 +32,7 @@ class PiRpcError(RuntimeError):
 class PiRpcClient:
     """Run one Pi RPC session for the lifetime of an async context."""
 
-    def __init__(self, command: tuple[str, ...] = ("pi", "--mode", "rpc")):
+    def __init__(self, command: tuple[str, ...] = _DEFAULT_COMMAND):
         self._command = command
         self._process: asyncio.subprocess.Process | None = None
         self._reader: asyncio.Task[None] | None = None
