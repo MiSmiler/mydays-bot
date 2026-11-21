@@ -8,6 +8,8 @@ from fastapi.testclient import TestClient
 from mydays_bot.pi_rpc import PiRpcClient, PiRpcError, PiRpcRejected, Record
 from mydays_bot.server import create_app
 
+LOCAL_SOCKET = "ws://127.0.0.1:8000/ws"
+
 
 class ControlledPi(PiRpcClient):
     def __init__(self) -> None:
@@ -58,8 +60,8 @@ def test_shares_one_turn_and_only_publishes_assistant_text_after_settlement():
             portal.call(pi.incoming.put_nowait, event)
 
         with (
-            client.websocket_connect("/ws") as first,
-            client.websocket_connect("/ws") as second,
+            client.websocket_connect(LOCAL_SOCKET) as first,
+            client.websocket_connect(LOCAL_SOCKET) as second,
         ):
             for socket in (first, second):
                 assert socket.receive_json() == _history()
@@ -109,7 +111,7 @@ def test_shares_one_turn_and_only_publishes_assistant_text_after_settlement():
                 }
                 assert socket.receive_json() == _status("tool_call")
 
-            with client.websocket_connect("/ws") as late:
+            with client.websocket_connect(LOCAL_SOCKET) as late:
                 assert late.receive_json() == _history(user)
                 assert late.receive_json() == _status("tool_call")
                 emit({"type": "tool_execution_end", "toolCallId": "tool-2"})
@@ -126,7 +128,7 @@ def test_shares_one_turn_and_only_publishes_assistant_text_after_settlement():
                 for socket in (first, second, late):
                     assert socket.receive_json() == _status("thinking")
 
-                with client.websocket_connect("/ws") as not_settled:
+                with client.websocket_connect(LOCAL_SOCKET) as not_settled:
                     assert not_settled.receive_json() == _history(user)
                     assert not_settled.receive_json() == _status("thinking")
 
@@ -139,7 +141,7 @@ def test_shares_one_turn_and_only_publishes_assistant_text_after_settlement():
                         }
                         assert socket.receive_json() == _status("idle")
 
-            with client.websocket_connect("/ws") as reconnected:
+            with client.websocket_connect(LOCAL_SOCKET) as reconnected:
                 assert reconnected.receive_json() == _history(
                     user, {"role": "assistant", "text": text}
                 )
@@ -153,7 +155,7 @@ def test_bad_prompts_and_pi_rejection_leave_session_available():
     pi = ControlledPi()
     with (
         TestClient(create_app(lambda: pi)) as client,
-        client.websocket_connect("/ws") as socket,
+        client.websocket_connect(LOCAL_SOCKET) as socket,
     ):
         assert client.portal is not None
         assert socket.receive_json() == _history()
@@ -181,13 +183,13 @@ def test_turn_continues_after_the_submitting_socket_disconnects():
     pi = ControlledPi()
     with TestClient(create_app(lambda: pi)) as client:
         assert client.portal is not None
-        with client.websocket_connect("/ws") as sender:
+        with client.websocket_connect(LOCAL_SOCKET) as sender:
             assert sender.receive_json() == _history()
             assert sender.receive_json() == _status("idle")
             sender.send_json(_prompt("Question"))
             assert sender.receive_json() == _status("thinking")
 
-        with client.websocket_connect("/ws") as observer:
+        with client.websocket_connect(LOCAL_SOCKET) as observer:
             assert observer.receive_json() == _history()
             assert observer.receive_json() == _status("thinking")
             client.portal.call(pi.replies.put_nowait, {"disposition": "started"})
@@ -212,18 +214,32 @@ def test_turn_continues_after_the_submitting_socket_disconnects():
             assert observer.receive_json() == _status("idle")
 
 
-def test_browser_connections_require_the_same_origin():
-    with TestClient(create_app(ControlledPi)) as client:
-        with (
-            pytest.raises(WebSocketDisconnect) as rejected,
-            client.websocket_connect(
-                "/ws", headers={"origin": "http://another.invalid"}
-            ),
-        ):
-            pytest.fail("Cross-origin socket was accepted")
-        assert rejected.value.code == 1008
+@pytest.mark.parametrize("host", ["127.0.0.1:8000", "localhost:8000"])
+def test_accepts_same_origin_connections_on_loopback(host: str):
+    with (
+        TestClient(create_app(ControlledPi)) as client,
+        client.websocket_connect(
+            f"ws://{host}/ws", headers={"origin": f"http://{host}"}
+        ) as socket,
+    ):
+        assert socket.receive_json() == _history()
+        assert socket.receive_json() == _status("idle")
 
-        with client.websocket_connect(
-            "/ws", headers={"origin": "http://testserver"}
-        ) as socket:
-            assert socket.receive_json() == _history()
+
+@pytest.mark.parametrize(
+    ("host", "origin"),
+    [
+        ("127.0.0.1:8000", "http://another.invalid:8000"),
+        ("another.invalid:8000", "http://another.invalid:8000"),
+        ("another.invalid:8000", None),
+    ],
+)
+def test_rejects_untrusted_hosts_and_origins(host: str, origin: str | None):
+    headers = {"origin": origin} if origin is not None else {}
+    with (
+        TestClient(create_app(ControlledPi)) as client,
+        pytest.raises(WebSocketDisconnect) as rejected,
+        client.websocket_connect(f"ws://{host}/ws", headers=headers),
+    ):
+        pytest.fail("Untrusted socket was accepted")
+    assert rejected.value.code == 1008

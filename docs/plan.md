@@ -28,6 +28,7 @@ The server wraps `pi` (`pi --mode rpc`) as its underlying agent engine. It maint
 
 1. **Single Active Session**:
    - The Python server spawns one `pi --mode rpc` subprocess on startup.
+   - Both the server and the one-shot CLI run `pi` with all tools disabled (`--no-tools`). Tools can be enabled later as needed.
    - Each startup creates a new session by default (persisted to disk by `pi`).
    - The `pi` session is the source of truth for conversation history.
    - The server accepts only one prompt at a time. While a turn is in progress, new prompts are rejected, never queued, and never added to the conversation.
@@ -54,7 +55,7 @@ The server wraps `pi` (`pi --mode rpc`) as its underlying agent engine. It maint
 
 > **Instructions for implementing agents**: Do NOT implement the entire plan in a single task. Execute **one phase (and one task within that phase) at a time**, verify it works, and check with the user before moving to the next task.
 
-### Phase 1: LAN Web Chat + `pi` RPC Core (Current Target)
+### Phase 1: Local Web Chat + `pi` RPC Core (Current Target)
 
 Goal: Deliver a working local web chat connected to a single `pi --mode rpc` session, with minimal raw HTML and Vanilla TypeScript.
 
@@ -65,14 +66,15 @@ Goal: Deliver a working local web chat connected to a single `pi --mode rpc` ses
   - Support sending `prompt`, `follow_up`, and `get_messages`, and consuming `message_update`, tool execution events, and `agent_settled`. Phase 1's WebSocket endpoint does not use follow-up queueing.
 
 - **Task 1.2: FastAPI Server & WebSocket Hub**
-  - Build the FastAPI server and WebSocket endpoint (`/ws`). Preserve the existing one-shot CLI and add `uv run mydays-bot --serve`, which binds to `127.0.0.1` by default. Use `--host 0.0.0.0` to opt in to LAN access.
+  - Build the FastAPI server and WebSocket endpoint (`/ws`). Preserve the existing one-shot CLI and add `uv run mydays-bot --serve`, which listens only on `127.0.0.1:8000` during local development.
+  - Accept only `127.0.0.1:8000` and `localhost:8000` as WebSocket `Host` values. If a request includes an `Origin`, it must match the server origin.
   - Send Pi-backed conversation history and the current status on connect. Accept one prompt at a time and report busy rejections only to the submitting client.
   - Broadcast user messages and status changes to all connected clients. After the turn settles, broadcast the complete assistant reply without streaming text deltas.
 
 - **Task 1.3: Minimal HTML + TypeScript Frontend**
   - Set up a minimal Vite + Vanilla TypeScript frontend (unstyled plain HTML).
   - Render history, live user messages, complete assistant replies, and the status indicator (`Thinking...`, `Tool Call...`). Show a busy notice when a prompt is rejected.
-  - Serve or proxy the frontend so it can be accessed from any browser on the LAN.
+  - Serve or proxy the frontend so the browser can connect to `/ws` from the same origin. LAN deployment is deferred.
 
 ---
 

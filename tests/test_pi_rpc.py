@@ -13,7 +13,7 @@ pytestmark = pytest.mark.asyncio
 PI_DOUBLE_PATH = Path(__file__).resolve().parent / "fixtures" / "pi_rpc_double.py"
 
 
-async def test_launches_pi_with_fixed_model_and_without_optional_resources(
+async def test_launches_pi_with_fixed_model_and_without_tools_or_optional_resources(
     monkeypatch: pytest.MonkeyPatch,
 ):
     launch = AsyncMock(side_effect=FileNotFoundError("Pi executable not found"))
@@ -32,6 +32,7 @@ async def test_launches_pi_with_fixed_model_and_without_optional_resources(
         "deepseek",
         "--model",
         "deepseek-flash",
+        "--no-tools",
         "--no-extensions",
         "--no-skills",
         "--no-prompt-templates",

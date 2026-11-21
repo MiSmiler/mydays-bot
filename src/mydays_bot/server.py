@@ -10,6 +10,10 @@ from mydays_bot.pi_rpc import PiRpcClient, PiRpcError, PiRpcRejected, Record
 
 logger = logging.getLogger(__name__)
 
+SERVER_HOST = "127.0.0.1"
+SERVER_PORT = 8000
+_TRUSTED_HOSTS = {f"{SERVER_HOST}:{SERVER_PORT}", f"localhost:{SERVER_PORT}"}
+
 
 def create_app(make_pi: Callable[[], PiRpcClient] = PiRpcClient) -> FastAPI:
     @asynccontextmanager
@@ -176,10 +180,12 @@ def _message_text(content: object) -> str:
 
 
 async def _websocket(websocket: WebSocket) -> None:
-    # Binding to localhost does not stop an unrelated website from opening a socket.
+    # A matching Origin is not enough when the requested Host is untrusted.
+    host = websocket.headers.get("host", "").lower()
     origin = websocket.headers.get("origin")
-    scheme = "https" if websocket.url.scheme == "wss" else "http"
-    if origin is not None and origin != f"{scheme}://{websocket.url.netloc}":
+    scheme = "https" if websocket.scope.get("scheme") == "wss" else "http"
+    origin_matches = origin is None or origin == f"{scheme}://{host}"
+    if host not in _TRUSTED_HOSTS or not origin_matches:
         await websocket.close(code=1008)
         return
 

@@ -16,6 +16,7 @@ _DEFAULT_COMMAND = (
     "deepseek",
     "--model",
     "deepseek-flash",
+    "--no-tools",
     "--no-extensions",
     "--no-skills",
     "--no-prompt-templates",
