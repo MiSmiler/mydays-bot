@@ -66,6 +66,7 @@ function messageTime(timestamp: number | null): HTMLTimeElement | null {
 
 function appendMessage(message: ChatMessage): void {
   const item = document.createElement("li");
+  item.dataset.role = message.role;
   const heading = document.createElement("div");
   heading.className = "message-heading";
   const label = document.createElement("span");

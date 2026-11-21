@@ -57,6 +57,10 @@ main {
   overflow-wrap: anywhere;
 }
 
+[data-role="user"] .message-body {
+  text-align: right;
+}
+
 #prompt-form {
   display: grid;
   gap: 0.75rem;
