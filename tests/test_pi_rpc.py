@@ -6,7 +6,6 @@ from unittest.mock import patch
 
 from mydays_bot.pi_rpc import PiRpcClient, PiRpcError
 
-
 PI_DOUBLE_PATH = Path(__file__).resolve().parent / "fixtures" / "pi_rpc_double.py"
 
 
@@ -18,10 +17,10 @@ class PiRpcClientTest(unittest.IsolatedAsyncioTestCase):
                 "mydays_bot.pi_rpc.asyncio.create_subprocess_exec",
                 side_effect=FileNotFoundError("Pi executable not found"),
             ) as launch,
+            self.assertRaisesRegex(PiRpcError, "Could not start Pi RPC"),
         ):
-            with self.assertRaisesRegex(PiRpcError, "Could not start Pi RPC"):
-                async with PiRpcClient():
-                    pass
+            async with PiRpcClient():
+                pass
 
         launch.assert_awaited_once_with(
             "pi",
@@ -58,7 +57,9 @@ class PiRpcClientTest(unittest.IsolatedAsyncioTestCase):
             delta = await anext(events)
             self.assertEqual(delta["assistantMessageEvent"]["delta"], text)
             for stage in ("start", "update", "end"):
-                self.assertEqual((await anext(events))["type"], f"tool_execution_{stage}")
+                self.assertEqual(
+                    (await anext(events))["type"], f"tool_execution_{stage}"
+                )
             self.assertEqual((await anext(events))["type"], "agent_settled")
 
         with self.assertRaises(StopAsyncIteration):

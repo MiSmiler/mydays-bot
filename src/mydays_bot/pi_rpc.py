@@ -147,7 +147,9 @@ class PiRpcClient:
         try:
             async for line in _read_frames(stdout):
                 record = json.loads(line.decode("utf-8"))
-                if not isinstance(record, dict) or not isinstance(record.get("type"), str):
+                if not isinstance(record, dict) or not isinstance(
+                    record.get("type"), str
+                ):
                     raise PiRpcError("Pi RPC stdout returned an invalid record")
                 if record["type"] != "response":
                     self._events.put_nowait(record)
