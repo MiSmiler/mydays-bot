@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>mydays-bot</title>
+  </head>
+  <body>
+    <main>
+      <h1>mydays-bot</h1>
+      <p id="session-status" role="status">Connecting...</p>
+      <ol id="messages" aria-label="Conversation"></ol>
+      <form id="prompt-form">
+        <label for="prompt">Message</label><br />
+        <textarea id="prompt" rows="3" required></textarea><br />
+        <button type="submit" disabled>Send</button>
+      </form>
+      <p id="notice" role="status"></p>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

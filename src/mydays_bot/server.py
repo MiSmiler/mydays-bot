@@ -3,8 +3,11 @@ import json
 import logging
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager, suppress
+from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import PlainTextResponse
+from fastapi.staticfiles import StaticFiles
 
 from mydays_bot.pi_rpc import PiRpcClient, PiRpcError, PiRpcRejected, Record
 
@@ -13,9 +16,14 @@ logger = logging.getLogger(__name__)
 SERVER_HOST = "127.0.0.1"
 SERVER_PORT = 8000
 _TRUSTED_HOSTS = {f"{SERVER_HOST}:{SERVER_PORT}", f"localhost:{SERVER_PORT}"}
+_FRONTEND_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
 
 
-def create_app(make_pi: Callable[[], PiRpcClient] = PiRpcClient) -> FastAPI:
+def create_app(
+    make_pi: Callable[[], PiRpcClient] = PiRpcClient,
+    *,
+    frontend_dist: Path = _FRONTEND_DIST,
+) -> FastAPI:
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[dict[str, _ChatSession]]:
         async with make_pi() as pi, asyncio.TaskGroup() as tasks:
@@ -29,7 +37,20 @@ def create_app(make_pi: Callable[[], PiRpcClient] = PiRpcClient) -> FastAPI:
 
     app = FastAPI(lifespan=lifespan)
     app.add_api_websocket_route("/ws", _websocket)
+    if (frontend_dist / "index.html").is_file():
+        # Keep the WebSocket route ahead of the catch-all static mount.
+        app.mount("/", StaticFiles(directory=frontend_dist, html=True))
+    else:
+        app.add_api_route("/", _frontend_not_built, include_in_schema=False)
     return app
+
+
+async def _frontend_not_built() -> PlainTextResponse:
+    return PlainTextResponse(
+        "Frontend not built. Run npm ci and npm run build in frontend/, "
+        "then restart the server.",
+        status_code=503,
+    )
 
 
 class _Subscriber:
@@ -99,6 +120,9 @@ class _ChatSession:
         except PiRpcError as error:
             self._mark_unavailable(error)
             return
+        if not self._available:
+            return
+        client.send({"type": "prompt_accepted"})
         if reply.get("disposition") == "handled":
             self._set_status("idle")
 
@@ -202,7 +226,10 @@ async def _websocket(websocket: WebSocket) -> None:
         chat.unsubscribe(client)
         sender.cancel()
         receiver.cancel()
-        results = await asyncio.gather(sender, receiver, return_exceptions=True)
+        # Keep handler cancellation separate from cancellation of the socket tasks.
+        results = await asyncio.shield(
+            asyncio.gather(sender, receiver, return_exceptions=True)
+        )
     for result in results:
         if isinstance(result, Exception) and not isinstance(
             result, WebSocketDisconnect

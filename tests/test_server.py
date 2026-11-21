@@ -1,5 +1,6 @@
 import asyncio
 from collections.abc import AsyncIterator
+from pathlib import Path
 
 import pytest
 from fastapi import WebSocketDisconnect
@@ -50,6 +51,37 @@ def _prompt(text: str) -> Record:
     return {"type": "prompt", "text": text}
 
 
+def test_serves_frontend_and_websocket_from_the_same_origin(tmp_path: Path):
+    assets = tmp_path / "assets"
+    assets.mkdir()
+    page = '<script type="module" src="/assets/main.js"></script>'
+    script = 'new WebSocket("/ws");'
+    (tmp_path / "index.html").write_text(page, encoding="utf-8")
+    (assets / "main.js").write_text(script, encoding="utf-8")
+
+    origin = "http://127.0.0.1:8000"
+    with TestClient(
+        create_app(ControlledPi, frontend_dist=tmp_path), base_url=origin
+    ) as client:
+        assert client.get("/").text == page
+        assert client.get("/assets/main.js").text == script
+        with client.websocket_connect(LOCAL_SOCKET, headers={"origin": origin}) as ws:
+            assert ws.receive_json() == _history()
+            assert ws.receive_json() == _status("idle")
+
+
+def test_unbuilt_frontend_explains_how_to_build_without_disabling_websocket(
+    tmp_path: Path,
+):
+    with TestClient(create_app(ControlledPi, frontend_dist=tmp_path)) as client:
+        response = client.get("/")
+        assert response.status_code == 503
+        assert "npm run build" in response.text
+        with client.websocket_connect(LOCAL_SOCKET) as ws:
+            assert ws.receive_json() == _history()
+            assert ws.receive_json() == _status("idle")
+
+
 def test_shares_one_turn_and_only_publishes_assistant_text_after_settlement():
     pi = ControlledPi()
     with TestClient(create_app(lambda: pi)) as client:
@@ -73,7 +105,8 @@ def test_shares_one_turn_and_only_publishes_assistant_text_after_settlement():
             second.send_json(_prompt("Not queued"))
             assert second.receive_json() == {"type": "error", "code": "busy"}
 
-            client.portal.call(pi.replies.put_nowait, {"disposition": "started"})
+            portal.call(pi.replies.put_nowait, {"disposition": "started"})
+            assert first.receive_json() == {"type": "prompt_accepted"}
             user = {"role": "user", "text": "Recorded by Pi", "source": "web"}
             emit(
                 {
@@ -175,6 +208,7 @@ def test_bad_prompts_and_pi_rejection_leave_session_available():
         socket.send_json(_prompt("Next"))
         assert socket.receive_json() == _status("thinking")
         client.portal.call(pi.replies.put_nowait, {"disposition": "handled"})
+        assert socket.receive_json() == {"type": "prompt_accepted"}
         assert socket.receive_json() == _status("idle")
         assert pi.prompts == [("Rejected", False), ("Next", False)]
 

@@ -39,8 +39,10 @@ The server wraps `pi` (`pi --mode rpc`) as its underlying agent engine. It maint
    - **Server -> Connecting Client**:
      - `{"type": "history", "messages": [...]}`, followed by the current `status`. History excludes partial assistant text.
    - **Server -> Submitting Client**:
-     - `{"type": "error", "code": "busy"}` when a prompt is rejected because a turn is in progress.
+     - `{"type": "prompt_accepted"}` after `pi` accepts the prompt.
+     - `{"type": "error", "code": "busy"}` when a prompt is rejected because a turn is in progress. Invalid prompts and rejections from `pi` use `invalid_prompt` and `prompt_failed` respectively.
    - **Server -> All Connected Clients**:
+     - `{"type": "error", "code": "pi_unavailable"}` if the RPC session becomes unavailable. New connections to an unavailable session also receive this error.
      - `{"type": "user_message", "text": "...", "source": "web" | "qq"}`
      - `{"type": "assistant_message", "text": "..."}` with complete assistant text after the turn settles.
      - `{"type": "status", "status": "idle" | "thinking" | "tool_call"}`
@@ -74,7 +76,20 @@ Goal: Deliver a working local web chat connected to a single `pi --mode rpc` ses
 - **Task 1.3: Minimal HTML + TypeScript Frontend**
   - Set up a minimal Vite + Vanilla TypeScript frontend (unstyled plain HTML).
   - Render history, live user messages, complete assistant replies, and the status indicator (`Thinking...`, `Tool Call...`). Show a busy notice when a prompt is rejected.
-  - Serve or proxy the frontend so the browser can connect to `/ws` from the same origin. LAN deployment is deferred.
+  - Allow drafting while the session is busy, but disable sending. Make the draft read-only while a submission is pending; clear it on acceptance, or leave it intact on rejection or disconnect. To reconnect, refresh the page; unsent drafts are not persisted across refreshes.
+  - Serve Vite's build from FastAPI at `/`, with a same-origin `/ws` connection. LAN deployment and bundling frontend assets in the Python wheel are deferred.
+
+#### Run the local web chat
+
+Build the frontend from the repository root with Node.js 22.12 or later:
+
+```sh
+npm --prefix frontend ci
+npm --prefix frontend run build
+uv run mydays-bot --serve
+```
+
+Open `http://127.0.0.1:8000/`. Node.js is only needed to build the frontend. If the frontend was not built before startup, `/` explains how to build it and `/ws` remains available; restart the server after the build.
 
 ---
 
