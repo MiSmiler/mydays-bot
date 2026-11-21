@@ -3,7 +3,11 @@ name = "mydays-bot"
 version = "0.1.0"
 description = "A self-hosted chat bridge for Pi"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "fastapi>=0.165.0",
+    "uvicorn>=0.54.0",
+    "websockets>=17.4",
+]
 
 [project.scripts]
 mydays-bot = "mydays_bot.cli:main"
@@ -14,6 +18,7 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "httpx2>=2.16.2",
     "pytest>=9.2.0",
     "pytest-asyncio>=1.5.0",
     "ruff>=0.17.6",

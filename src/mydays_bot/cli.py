@@ -3,7 +3,10 @@ import asyncio
 import json
 import sys
 
+import uvicorn
+
 from mydays_bot.pi_rpc import PiRpcClient, PiRpcError
+from mydays_bot.server import create_app
 
 
 async def _run(message: str | None) -> None:
@@ -29,7 +32,19 @@ def main() -> int:
         nargs="?",
         help="Send a prompt and print its JSONL events. With no prompt, print history.",
     )
+    parser.add_argument(
+        "--serve", action="store_true", help="Start the WebSocket server."
+    )
+    parser.add_argument("--host", help="Server bind address (default: 127.0.0.1).")
     args = parser.parse_args()
+    if args.serve:
+        if args.message is not None:
+            parser.error("--serve does not accept a prompt")
+        uvicorn.run(create_app(), host=args.host or "127.0.0.1")
+        return 0
+    if args.host is not None:
+        parser.error("--host requires --serve")
+
     try:
         asyncio.run(_run(args.message))
     except PiRpcError as error:

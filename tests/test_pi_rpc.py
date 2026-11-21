@@ -67,6 +67,13 @@ async def test_routes_replies_and_preserves_lf_framing():
         await anext(events)
 
 
+async def test_prompt_can_opt_out_of_follow_up_on_the_wire():
+    command = (sys.executable, "-u", str(PI_DOUBLE_PATH))
+    async with PiRpcClient(command) as pi:
+        reply = await pi.prompt("Do not queue", queue_if_busy=False)
+        assert reply == {"disposition": "started"}
+
+
 async def test_unexpected_exit_unblocks_command_and_events():
     command = (sys.executable, "-c", "import sys; sys.stdin.readline()")
     async with asyncio.timeout(5), PiRpcClient(command) as pi:

@@ -20,6 +20,10 @@ def main() -> None:
         request = json.loads(line)
         match request["type"]:
             case "prompt":
+                if request["message"] == "Do not queue":
+                    assert "streamingBehavior" not in request
+                    respond(request, {"disposition": "started"})
+                    continue
                 assert request["streamingBehavior"] == "followUp"
                 prompt_count += 1
                 if prompt_count == 1:

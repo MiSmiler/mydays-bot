@@ -29,6 +29,10 @@ class PiRpcError(RuntimeError):
     pass
 
 
+class PiRpcRejected(PiRpcError):
+    pass
+
+
 class PiRpcClient:
     """Run one Pi RPC session for the lifetime of an async context."""
 
@@ -82,9 +86,10 @@ class PiRpcClient:
         if exc_type is None and process.returncode != 0:
             raise PiRpcError(f"Pi RPC exited with status {process.returncode}")
 
-    async def prompt(self, message: str) -> Record:
+    async def prompt(self, message: str, *, queue_if_busy: bool = True) -> Record:
         async with self._prompt_lock:
-            # Let Pi choose between starting and queueing using its current state.
+            if not queue_if_busy:
+                return await self._request("prompt", message=message)
             return await self._request(
                 "prompt", message=message, streamingBehavior="followUp"
             )
@@ -139,7 +144,7 @@ class PiRpcClient:
         if response is None:
             raise PiRpcError(self._failure or "Pi RPC closed before responding")
         if response.get("success") is not True:
-            raise PiRpcError(f"Pi RPC {command} failed: {response.get('error')}")
+            raise PiRpcRejected(f"Pi RPC {command} failed: {response.get('error')}")
         data = response.get("data")
         return data if isinstance(data, dict) else {}
 
