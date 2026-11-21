@@ -1,6 +1,8 @@
 import asyncio
 import json
 import shutil
+import subprocess
+import sys
 from collections.abc import AsyncIterator
 from contextlib import suppress
 from itertools import count
@@ -54,12 +56,17 @@ class PiRpcClient:
 
         executable, *arguments = self._command
         executable = shutil.which(executable) or executable
+        creation_flags = 0
+        if sys.platform == "win32":
+            # Let the parent close Pi's stdin instead of sharing its console Ctrl+C.
+            creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP
         try:
             self._process = await asyncio.create_subprocess_exec(
                 executable,
                 *arguments,
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
+                creationflags=creation_flags,
             )
         except OSError as error:
             raise PiRpcError(f"Could not start Pi RPC: {error}") from error

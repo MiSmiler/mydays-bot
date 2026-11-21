@@ -1,5 +1,6 @@
 import asyncio
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 from unittest.mock import AsyncMock
@@ -41,6 +42,9 @@ async def test_launches_pi_with_fixed_model_and_without_tools_or_optional_resour
         "--no-context-files",
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
+        creationflags=(
+            subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0
+        ),
     )
 
 
