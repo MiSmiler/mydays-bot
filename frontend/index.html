@@ -4,16 +4,17 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>mydays-bot</title>
+    <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
     <main>
-      <h1>mydays-bot</h1>
-      <p id="session-status" role="status">Connecting...</p>
-      <ol id="messages" aria-label="Conversation"></ol>
+      <ol id="messages" role="list" aria-label="Conversation"></ol>
       <form id="prompt-form">
-        <label for="prompt">Message</label><br />
-        <textarea id="prompt" rows="3" required></textarea><br />
-        <button type="submit" disabled>Send</button>
+        <textarea id="prompt" aria-label="Message" placeholder="Write a message…" rows="4" required></textarea>
+        <div class="prompt-actions">
+          <p id="session-status" role="status">Connecting...</p>
+          <button type="submit" disabled>Send</button>
+        </div>
       </form>
       <p id="notice" role="status"></p>
     </main>

@@ -50,14 +50,15 @@ function updateControls(): void {
 function appendMessage(message: ChatMessage): void {
   const item = document.createElement("li");
   const label = document.createElement("strong");
+  label.className = "message-role";
   label.textContent = message.role === "user"
-    ? `User (${sourceLabels[message.source]}): `
-    : "Assistant: ";
-  item.append(label);
-  for (const [index, line] of message.text.split("\n").entries()) {
-    if (index > 0) item.append(document.createElement("br"));
-    item.append(line);
-  }
+    ? `User (${sourceLabels[message.source]})`
+    : "Assistant";
+
+  const body = document.createElement("p");
+  body.className = "message-body";
+  body.textContent = message.text;
+  item.append(label, body);
   messages.append(item);
 }
 
