@@ -2,14 +2,17 @@ type MessageSource = "web" | "qq";
 type SessionStatus = "idle" | "thinking" | "tool_call";
 type ErrorCode = "busy" | "invalid_prompt" | "prompt_failed" | "pi_unavailable";
 
+type MessageContent = { text: string; timestamp: number | null };
+type UserMessageContent = MessageContent & { source: MessageSource };
+
 type ChatMessage =
-  | { role: "user"; text: string; source: MessageSource }
-  | { role: "assistant"; text: string };
+  | ({ role: "user" } & UserMessageContent)
+  | ({ role: "assistant" } & MessageContent);
 
 type ServerMessage =
   | { type: "history"; messages: ChatMessage[] }
-  | { type: "user_message"; text: string; source: MessageSource }
-  | { type: "assistant_message"; text: string }
+  | ({ type: "user_message" } & UserMessageContent)
+  | ({ type: "assistant_message" } & MessageContent)
   | { type: "status"; status: SessionStatus }
   | { type: "prompt_accepted" }
   | { type: "error"; code: ErrorCode };
@@ -47,18 +50,38 @@ function updateControls(): void {
   send.disabled = !isConnected || !isIdle || awaitingResult || !hasDraft;
 }
 
+function messageTime(timestamp: number | null): HTMLTimeElement | null {
+  if (timestamp === null) return null;
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return null;
+
+  const pad = (part: number) => String(part).padStart(2, "0");
+  const day = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  const clock = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  const time = document.createElement("time");
+  time.dateTime = date.toISOString();
+  time.textContent = `${day} ${clock}`;
+  return time;
+}
+
 function appendMessage(message: ChatMessage): void {
   const item = document.createElement("li");
-  const label = document.createElement("strong");
-  label.className = "message-role";
-  label.textContent = message.role === "user"
+  const heading = document.createElement("div");
+  heading.className = "message-heading";
+  const label = document.createElement("span");
+  const role = document.createElement("strong");
+  role.textContent = message.role === "user"
     ? `User (${sourceLabels[message.source]})`
     : "Assistant";
+  label.append(role);
+  const time = messageTime(message.timestamp);
+  if (time) label.append(" · ", time);
+  heading.append(label);
 
   const body = document.createElement("p");
   body.className = "message-body";
   body.textContent = message.text;
-  item.append(label, body);
+  item.append(heading, body);
   messages.append(item);
 }
 
