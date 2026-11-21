@@ -1,0 +1,32 @@
+[project]
+name = "mydays-bot"
+version = "0.1.0"
+description = "A self-hosted chat bridge for Pi"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.165.0",
+    "uvicorn>=0.54.0",
+    "websockets>=17.4",
+]
+
+[project.scripts]
+mydays-bot = "mydays_bot.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.11.2,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "httpx2>=2.16.2",
+    "pytest>=9.2.0",
+    "pytest-asyncio>=1.5.0",
+    "ruff>=0.17.6",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.ruff.lint]
+extend-select = ["I"]
