@@ -107,11 +107,21 @@ def test_shares_one_turn_and_only_publishes_assistant_text_after_settlement():
 
             portal.call(pi.replies.put_nowait, {"disposition": "started"})
             assert first.receive_json() == {"type": "prompt_accepted"}
-            user = {"role": "user", "text": "Recorded by Pi", "source": "web"}
+            user_timestamp = 1_795_277_800_000
+            user = {
+                "role": "user",
+                "text": "Recorded by Pi",
+                "source": "web",
+                "timestamp": user_timestamp,
+            }
             emit(
                 {
                     "type": "message_end",
-                    "message": {"role": "user", "content": user["text"]},
+                    "message": {
+                        "role": "user",
+                        "content": user["text"],
+                        "timestamp": user_timestamp,
+                    },
                 }
             )
             emit(
@@ -130,6 +140,7 @@ def test_shares_one_turn_and_only_publishes_assistant_text_after_settlement():
                             {"type": "text", "text": "Checking."},
                             {"type": "toolCall", "id": "tool-1"},
                         ],
+                        "timestamp": user_timestamp + 1_000,
                     },
                 }
             )
@@ -141,6 +152,7 @@ def test_shares_one_turn_and_only_publishes_assistant_text_after_settlement():
                     "type": "user_message",
                     "text": user["text"],
                     "source": "web",
+                    "timestamp": user_timestamp,
                 }
                 assert socket.receive_json() == _status("tool_call")
 
@@ -148,12 +160,25 @@ def test_shares_one_turn_and_only_publishes_assistant_text_after_settlement():
                 assert late.receive_json() == _history(user)
                 assert late.receive_json() == _status("tool_call")
                 emit({"type": "tool_execution_end", "toolCallId": "tool-2"})
+                reply_timestamp = user_timestamp + 2_000
                 emit(
                     {
                         "type": "message_end",
                         "message": {
                             "role": "assistant",
                             "content": [{"type": "text", "text": "Done."}],
+                            "timestamp": reply_timestamp,
+                        },
+                    }
+                )
+                emit(
+                    {
+                        "type": "message_end",
+                        "message": {
+                            "role": "assistant",
+                            "content": [{"type": "text", "text": "Interrupted."}],
+                            "stopReason": "aborted",
+                            "timestamp": reply_timestamp + 1_000,
                         },
                     }
                 )
@@ -171,12 +196,14 @@ def test_shares_one_turn_and_only_publishes_assistant_text_after_settlement():
                         assert socket.receive_json() == {
                             "type": "assistant_message",
                             "text": text,
+                            "timestamp": reply_timestamp,
                         }
                         assert socket.receive_json() == _status("idle")
 
             with client.websocket_connect(LOCAL_SOCKET) as reconnected:
                 assert reconnected.receive_json() == _history(
-                    user, {"role": "assistant", "text": text}
+                    user,
+                    {"role": "assistant", "text": text, "timestamp": reply_timestamp},
                 )
                 assert reconnected.receive_json() == _status("idle")
             assert pi.prompts == [("First", False)]
@@ -240,10 +267,12 @@ def test_turn_continues_after_the_submitting_socket_disconnects():
                 "type": "user_message",
                 "text": "Question",
                 "source": "web",
+                "timestamp": None,
             }
             assert observer.receive_json() == {
                 "type": "assistant_message",
                 "text": "Reply",
+                "timestamp": None,
             }
             assert observer.receive_json() == _status("idle")
 

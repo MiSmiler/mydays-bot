@@ -76,7 +76,7 @@ class _ChatSession:
         self._status = "idle"
         self._available = True
         self._submission: asyncio.Task[None] | None = None
-        self._assistant_parts: list[str] = []
+        self._assistant_parts: list[tuple[str, int | None]] = []
         self._active_tools: set[str] = set()
 
     def subscribe(self) -> _Subscriber:
@@ -148,9 +148,11 @@ class _ChatSession:
                     self._set_status("tool_call" if self._active_tools else "thinking")
             case "agent_settled":
                 if self._assistant_parts:
-                    text = "\n\n".join(self._assistant_parts)
-                    self._history.append({"role": "assistant", "text": text})
-                    self._broadcast({"type": "assistant_message", "text": text})
+                    text = "\n\n".join(text for text, _ in self._assistant_parts)
+                    _, timestamp = self._assistant_parts[-1]
+                    message = {"text": text, "timestamp": timestamp}
+                    self._history.append({"role": "assistant", **message})
+                    self._broadcast({"type": "assistant_message", **message})
                 self._assistant_parts.clear()
                 self._active_tools.clear()
                 self._set_status("idle")
@@ -161,13 +163,16 @@ class _ChatSession:
         text = _message_text(message.get("content"))
         if not text:
             return
+        raw_timestamp = message.get("timestamp")
+        timestamp = raw_timestamp if type(raw_timestamp) is int else None
         match message.get("role"):
             case "user":
-                self._history.append({"role": "user", "text": text, "source": "web"})
-                self._broadcast({"type": "user_message", "text": text, "source": "web"})
+                entry = {"text": text, "source": "web", "timestamp": timestamp}
+                self._history.append({"role": "user", **entry})
+                self._broadcast({"type": "user_message", **entry})
             case "assistant":
                 if message.get("stopReason") not in ("error", "aborted"):
-                    self._assistant_parts.append(text)
+                    self._assistant_parts.append((text, timestamp))
 
     def _mark_unavailable(self, error: PiRpcError) -> None:
         if not self._available:
